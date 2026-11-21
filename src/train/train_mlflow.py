@@ -24,7 +24,7 @@ import numpy as np
 import pandas as pd
 from mlflow.models import infer_signature
 from sklearn.compose import ColumnTransformer
-from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
+from sklearn.ensemble import HistGradientBoostingClassifier, RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import f1_score, roc_auc_score
 from sklearn.model_selection import train_test_split
@@ -51,9 +51,11 @@ def preprocessing() -> ColumnTransformer:
 # TODO 1: choose at least three candidates and justify them in MODEL_SELECTION.md.
 # Change the settings, not just the names: a different model family or a clearly different setting each time.
 CANDIDATES = {
-    "logreg": LogisticRegression(max_iter=1000),
-    "random_forest": RandomForestClassifier(n_estimators=200, max_depth=8, random_state=42),
-    "gradient_boosting": GradientBoostingClassifier(random_state=42),
+    "logreg_balanced": LogisticRegression(max_iter=1000, class_weight="balanced", random_state=42),
+    "random_forest_balanced": RandomForestClassifier(
+        n_estimators=300, max_depth=8, class_weight="balanced", random_state=42, n_jobs=-1
+    ),
+    "hgb": HistGradientBoostingClassifier(max_iter=200, learning_rate=0.1, random_state=42),
 }
 
 
@@ -111,7 +113,16 @@ def main() -> None:
 
             # the model, with its signature (inputs and outputs) and an example row
             signature = infer_signature(X_te, proba)
-            info = mlflow.sklearn.log_model(model, name="model", signature=signature, input_example=X_te.head(3))
+            info = mlflow.sklearn.log_model(
+                model, 
+                name="model", 
+                signature=signature, 
+                input_example=X_te.head(3),
+                skops_trusted_types=[
+                    "sklearn.tree._tree.Tree",
+                    "sklearn.ensemble._hist_gradient_boosting.predictor.TreePredictor"
+                ]
+            )
             mlflow.set_tag("model_uri", info.model_uri)
 
             print(f"{name:18s} run {run.info.run_id[:8]}  auc {metrics['auc']:.3f}  f1 {metrics['f1']:.3f}  "
